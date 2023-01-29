@@ -1,19 +1,17 @@
 package f_s_z_LFU_Cache
 
-import java.util.Collections
-
 class LFUCache(capacity: Int) {
     private val cacheHashMap: HashMap<Int, Int>
     private val countersHashMap: HashMap<Int, Int>
-    private var minUsed = 0 //need to use somehow
+    private var minUsed = 0
     private var capacity = 0
-    private var lastUsedKey: MutableList<Int>
+    private var lastUsedKey: HashMap<Int, MutableList<Int>>
 
     init {
         this.capacity = capacity
         cacheHashMap = hashMapOf()
         countersHashMap = hashMapOf()
-        lastUsedKey = mutableListOf()
+        lastUsedKey = hashMapOf()
         print("null, ")
     }
 
@@ -21,12 +19,7 @@ class LFUCache(capacity: Int) {
         val result = cacheHashMap[key]
         print("${result ?: -1}, ")
         result?.let {
-//            countersHashMap.computeIfPresent(key) { k, v ->
-//              //  print("up=($k, $v->${v+1})")
-//                v + 1
-//            }
             updateMinimalUsed(key)
-            updateLastUsed(key)
         }
         return result ?: -1
     }
@@ -43,7 +36,7 @@ class LFUCache(capacity: Int) {
             if (cacheHashMap.size < capacity) {
                 cacheHashMap[key] = value
                 countersHashMap[key] = 1
-                lastUsedKey.add(key)
+                addOrUpdateLastUsed(key, 1)
                 minUsed = 1
             } else {
                 replaceEntry(key, value)
@@ -55,51 +48,46 @@ class LFUCache(capacity: Int) {
     private fun updateValue(key: Int, value: Int) {
         cacheHashMap[key] = value
         updateMinimalUsed(key)
-//        countersHashMap.computeIfPresent(key) { k, v ->
-//           // print("up=($k, $v->${v+1})")
-//            v + 1
-//        }
-        updateLastUsed(key)
+    }
+
+    private fun removeKeyInLastUsed(key: Int) {
+        lastUsedKey.forEach {
+            it.value.remove(key)
+        }
+    }
+    private fun addOrUpdateLastUsed(key: Int, counter: Int){
+        removeKeyInLastUsed(key)
+
+        if (lastUsedKey.containsKey(counter)) {
+            val list = lastUsedKey[counter]
+            list!!.add(key)
+            lastUsedKey.replace(counter, list)
+        } else {
+            lastUsedKey[counter] = mutableListOf(key)
+        }
     }
 
     private fun updateMinimalUsed(key: Int) {
         val counter = countersHashMap[key]!!
         val nextCounter = counter + 1
 
-       // print("all=${countersHashMap}, min=$minUsed")
         if (minUsed == counter && countersHashMap.filter { (k, v) -> v == counter }.size == 1)
             minUsed = nextCounter
 
         countersHashMap[key] = nextCounter
-    }
-
-    private fun updateLastUsed(key: Int){
-        lastUsedKey.remove(key)
-        lastUsedKey.add(key)
+        addOrUpdateLastUsed(key, nextCounter)
     }
 
     private fun replaceEntry(key: Int, value: Int) {
-        //val entries = countersHashMap.filter { (k, v) -> v == countersHashMap.minBy { it.value }.value  }
-        val entries = countersHashMap.filter { (k, v) -> v == minUsed  }
-        var removeKeyIndex = Int.MAX_VALUE
-        var removeKey = -1
-
-        entries.forEach { entry ->
-            val ent = lastUsedKey.indexOf(entry.key)
-            if (ent!! < removeKeyIndex) {
-                removeKeyIndex = ent
-                removeKey = entry.key
-            }
-        }
-//        print("last=$lastUsedKey,  ")
-//        print("counter=$countersHashMap , ent=$entries, r=$removeKey ")
+        val entries = lastUsedKey[minUsed]
+        var removeKey = entries!![0]
 
         cacheHashMap.remove(removeKey)
         countersHashMap.remove(removeKey)
         cacheHashMap[key] = value
         countersHashMap[key] = 1
-        lastUsedKey.remove(removeKey)
-        lastUsedKey.add(key)
+        removeKeyInLastUsed(removeKey)
+        addOrUpdateLastUsed(key, 1)
         minUsed = 1
     }
 }
