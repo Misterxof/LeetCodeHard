@@ -5,7 +5,7 @@ import java.util.Collections
 class LFUCache(capacity: Int) {
     private val cacheHashMap: HashMap<Int, Int>
     private val countersHashMap: HashMap<Int, Int>
-    private val minUsed = 0 //need to use somehow
+    private var minUsed = 0 //need to use somehow
     private var capacity = 0
     private var lastUsedKey: MutableList<Int>
 
@@ -21,10 +21,11 @@ class LFUCache(capacity: Int) {
         val result = cacheHashMap[key]
         print("${result ?: -1}, ")
         result?.let {
-            countersHashMap.computeIfPresent(key) { k, v ->
-              //  print("up=($k, $v->${v+1})")
-                v + 1
-            }
+//            countersHashMap.computeIfPresent(key) { k, v ->
+//              //  print("up=($k, $v->${v+1})")
+//                v + 1
+//            }
+            updateMinimalUsed(key)
             updateLastUsed(key)
         }
         return result ?: -1
@@ -43,6 +44,7 @@ class LFUCache(capacity: Int) {
                 cacheHashMap[key] = value
                 countersHashMap[key] = 1
                 lastUsedKey.add(key)
+                minUsed = 1
             } else {
                 replaceEntry(key, value)
             }
@@ -51,12 +53,24 @@ class LFUCache(capacity: Int) {
     }
 
     private fun updateValue(key: Int, value: Int) {
-        cacheHashMap.computeIfPresent(key) { k, v -> value }
-        countersHashMap.computeIfPresent(key) { k, v ->
-           // print("up=($k, $v->${v+1})")
-            v + 1
-        }
+        cacheHashMap[key] = value
+        updateMinimalUsed(key)
+//        countersHashMap.computeIfPresent(key) { k, v ->
+//           // print("up=($k, $v->${v+1})")
+//            v + 1
+//        }
         updateLastUsed(key)
+    }
+
+    private fun updateMinimalUsed(key: Int) {
+        val counter = countersHashMap[key]!!
+        val nextCounter = counter + 1
+
+       // print("all=${countersHashMap}, min=$minUsed")
+        if (minUsed == counter && countersHashMap.filter { (k, v) -> v == counter }.size == 1)
+            minUsed = nextCounter
+
+        countersHashMap[key] = nextCounter
     }
 
     private fun updateLastUsed(key: Int){
@@ -65,7 +79,8 @@ class LFUCache(capacity: Int) {
     }
 
     private fun replaceEntry(key: Int, value: Int) {
-        val entries = countersHashMap.filter { (k, v) -> v == countersHashMap.minBy { it.value }.value  }
+        //val entries = countersHashMap.filter { (k, v) -> v == countersHashMap.minBy { it.value }.value  }
+        val entries = countersHashMap.filter { (k, v) -> v == minUsed  }
         var removeKeyIndex = Int.MAX_VALUE
         var removeKey = -1
 
@@ -85,5 +100,6 @@ class LFUCache(capacity: Int) {
         countersHashMap[key] = 1
         lastUsedKey.remove(removeKey)
         lastUsedKey.add(key)
+        minUsed = 1
     }
 }
